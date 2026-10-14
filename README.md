@@ -4,7 +4,7 @@
 
 A single-player trainer for Way of the Hunter 2 by Backtrackleb.
 
-Speed boost, high jump, Superman (fly), max health, safe landing, money,
+Speed boost, high jump, Superman (fly), max health, No fall damage, money,
 
 weather and time-of-day control.
 

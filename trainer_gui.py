@@ -12,7 +12,7 @@ HOTKEYS_ONLY_IN_GAME = True      # hotkeys only act when the game (or this windo
 GAME_EXE = "woth2-win64-shipping.exe"
 
 # Keys: F1-F12, INSERT, DELETE, HOME, END, PGUP, PGDN, NUM0-NUM9, SPACE, LCTRL, LSHIFT, LALT, A-Z, 0-9
-KEYS = {"speed": "F9", "jump": "F10", "super": "INSERT", "god": "F3", "land": "F4",
+KEYS = {"speed": "F9", "jump": "F10", "super": "INSERT", "god": "F3", "nofall": "F4",
         "money_small": "F5", "money_big": "F6", "time": "F7", "weather": "F8",
         "fly_up": "SPACE", "fly_down": "LCTRL"}      # fly_up / fly_down are held, not toggles
 
@@ -20,8 +20,11 @@ KEYS = {"speed": "F9", "jump": "F10", "super": "INSERT", "god": "F3", "land": "F
 OFF_VEL, OFF_MAXSPD, OFF_ACCEL, OFF_GRAVITY = 0xD8, 0x62E0, 0x62C8, 0x6380
 GAIT_SPEED = {1500: 300.0, 2000: 500.0}          # accel value -> natural speed (measured)
 CAP_DEFAULT, LOCK_TIMEOUT, GRAV_MIN = 800.0, 1.0, 0.03
-LAND_CAP = 120.0                                  # max downward speed while Safe landing is on
 FLY_GRAVITY = 0.001                               # gravity scale while Superman is on
+
+# fall damage: PlayerHealthComponent+0x140 -> HealthObjectEnergyMap; +0xE0 = {FName, CurveFloat*};
+# the curve maps landing speed to damage (2 keys: 13 -> 0.0, 18 -> 1.0); keys at curve+0xA0, 28 bytes each
+COMP_EMAP, FALL_SETUP, CURVE_ARR, KEY = 0x140, 0xE0, 0xA0, 28
 
 SOFT = "PlayerEconomy.Resources.SoftCurrency"
 MONEY_SMALL, MONEY_BIG = 100_000, 1_000_000
@@ -49,7 +52,7 @@ TIMES = [("Auto", None), ("08:00", 800.0), ("10:00", 1000.0), ("12:00", 1200.0),
 # ---------- shared state (the GUI and hotkeys write it, the worker thread reads it) ----------
 S = {"speed_on": False, "speed_mult": 2.0, "jump_on": False, "jump_level": 3.0,
      "super_on": False, "fly_speed": 800.0, "fly_down": 400.0,
-     "god_on": False, "land_on": False, "health": None,
+     "god_on": False, "nofall_on": False, "health": None,
      "weather_i": 0, "time_i": 0, "money_req": 0, "money": None,
      "status": "waiting_game", "stop": False}
 LOGQ = queue.Queue()
@@ -110,7 +113,7 @@ ACTIONS = {
     "jump":        lambda: flip("jump_on", "High jump"),
     "super":       lambda: flip("super_on", "Superman"),
     "god":         lambda: flip("god_on", "Max health"),
-    "land":        lambda: flip("land_on", "Safe landing"),
+    "nofall":      lambda: flip("nofall_on", "No fall damage"),
     "money_small": lambda: S.__setitem__("money_req", MONEY_SMALL),
     "money_big":   lambda: S.__setitem__("money_req", MONEY_BIG),
     "time":        lambda: S.__setitem__("time_i", (S["time_i"] + 1) % len(TIMES)),
@@ -164,6 +167,7 @@ def _worker():
     idx = None
     env = {"weather": 0, "sky": 0}
     health = {"comp": 0, "leaf": 0}
+    curve = {"data": 0, "orig": None, "flat": None}
     orig_flags = {}
 
     def refresh_env():
@@ -197,6 +201,48 @@ def _worker():
         b = rb(leaf + HP_VALUE, 4)
         v = struct.unpack("<f", b)[0] if b else -1.0
         return leaf if 0.0 <= v <= 1.0001 else 0          # sanity check: a real 0..1 health fraction
+
+    # ---- fall damage curve: flatten while "No fall damage" is on, restore afterwards ----
+    def curve_patch():
+        comp = health["comp"]
+        if not comp: return False
+        emap = rp(comp + COMP_EMAP)
+        cv = rp(emap + FALL_SETUP + 8) if ok(emap) else 0
+        if not ok(cv): return False
+        data = rp(cv + CURVE_ARR)
+        nb = rb(cv + CURVE_ARR + 8, 4)
+        num = struct.unpack("<i", nb)[0] if nb else 0
+        if not ok(data) or num != 2: return False
+        raw = rb(data, KEY * 2)
+        if not raw: return False
+        if curve["data"] == data and curve["flat"]:            # already ours: just keep it flat
+            if raw != curve["flat"]:
+                pm.write_bytes(data, curve["flat"], len(curve["flat"]))
+            return True
+        (t0, v0), (t1, v1) = (struct.unpack_from("<4xff", raw, i * KEY) for i in range(2))
+        if not (abs(t0 - 13.0) < 0.01 and abs(t1 - 18.0) < 0.01 and abs(v0) < 1e-3):
+            log(f"Fall-damage curve looks different ({t0:g},{v0:g}) ({t1:g},{v1:g}); not touching it. "
+                "The game may have been updated.")
+            return False
+        flat = bytearray(raw)
+        for i in range(2):
+            flat[i * KEY + 8: i * KEY + 20] = b"\0" * 12        # value + both tangents -> 0
+        flat = bytes(flat)
+        curve["data"], curve["flat"] = data, flat
+        curve["orig"] = raw if abs(v1 - 1.0) < 1e-3 else None
+        if curve["orig"] is None:
+            log("Curve was already flat (left over from an earlier session); restart the game to restore it.")
+        pm.write_bytes(data, flat, len(flat))
+        return True
+
+    def curve_restore():
+        try:
+            if curve["data"] and curve["orig"] and curve["flat"]:
+                if rb(curve["data"], len(curve["flat"])) == curve["flat"]:   # still our data, not something else
+                    pm.write_bytes(curve["data"], curve["orig"], len(curve["orig"]))
+        except Exception:
+            pass
+        curve["data"], curve["orig"], curve["flat"] = 0, None, None
 
     def soft_currency_slot():
         if idx is None: return None
@@ -257,7 +303,7 @@ def _worker():
 
     applied_w = applied_t = 0
     weather_writes, tod_packed = [], None
-    grav_set = cap_set = sup_was = god_was = False
+    grav_set = cap_set = sup_was = god_was = nofall_was = False
     moving, natural = False, None
     last_f = last_r = 0
     pending_lock = locked = False
@@ -302,7 +348,7 @@ def _worker():
                 last_health = now
                 try:
                     leaf = resolve_leaf()
-                    if not leaf and S["god_on"] and now - last_idx > 10.0:
+                    if not leaf and (S["god_on"] or S["nofall_on"]) and now - last_idx > 10.0:
                         last_idx = now                   # component may be newer than our object index
                         refresh_env(); leaf = resolve_leaf()
                     health["leaf"] = leaf
@@ -311,12 +357,29 @@ def _worker():
                         S["health"] = struct.unpack("<f", b)[0] * 100.0 if b else None
                     else:
                         S["health"] = None
+                    if S["nofall_on"]:
+                        curve_patch()                    # keeps it applied across level changes
                 except Exception:
                     health["leaf"] = 0
             if S["god_on"] != god_was:
                 god_was = S["god_on"]
                 if god_was and not health["leaf"]:
                     log("Health object not found yet; it will connect when it appears.")
+
+            # ---- No fall damage: flatten / restore the fall-damage curve ----
+            if S["nofall_on"] != nofall_was:
+                nofall_was = S["nofall_on"]
+                if nofall_was:
+                    try:
+                        if not health["comp"]: resolve_leaf()
+                        patched = curve_patch()
+                    except Exception:
+                        patched = False
+                    if not patched:
+                        log("Could not patch the fall-damage curve (stand in the world and try again).")
+                        S["nofall_on"] = nofall_was = False
+                else:
+                    curve_restore()
 
             holding = False
             try:
@@ -362,9 +425,6 @@ def _worker():
             sup, speed_on, jump_on = S["super_on"], S["speed_on"], S["jump_on"]
             if sup != sup_was:
                 sup_was = sup
-                if not sup and not S["land_on"]:
-                    S["land_on"] = True
-                    log("Superman off: Safe landing turned on so you float down.")
 
             try:
                 # gravity: Superman overrides High jump
@@ -381,18 +441,13 @@ def _worker():
                 elif cap_set:
                     pm.write_float(gmc + OFF_MAXSPD, CAP_DEFAULT); cap_set = False
 
-                # vertical: Superman steers it, Safe landing caps the fall
+                # vertical: Superman steers it
                 if sup:
                     holding = True
                     up = fg_ok and key_down(K_UP)
                     down = fg_ok and key_down(K_DOWN)
                     vz_t = S["fly_speed"] if up else (-S["fly_down"] if down else 0.0)
                     pm.write_bytes(gmc + OFF_VEL + 16, struct.pack("<d", vz_t), 8)
-                elif S["land_on"]:
-                    holding = True
-                    vz = struct.unpack("<d", pm.read_bytes(gmc + OFF_VEL + 16, 8))[0]
-                    if vz < -LAND_CAP:
-                        pm.write_bytes(gmc + OFF_VEL + 16, struct.pack("<d", -LAND_CAP), 8)
 
                 # horizontal: Superman or the speed boost, never both
                 target = None
@@ -427,6 +482,7 @@ def _worker():
     finally:
         try:
             release_weather()
+            curve_restore()
             g = get_gmc()
             if g:
                 pm.write_float(g + OFF_GRAVITY, 1.0)
@@ -573,16 +629,18 @@ class App(tk.Tk):
         self.sw_super = self.toggle_row(
             c, "Superman", KEYS["super"], ACTIONS["super"],
             sliders=[("fly_speed", 200.0, 3000.0, 50.0, "{:.0f}", "Fly speed"),
-                     ("fly_down", 100.0, 1500.0, 50.0, "{:.0f}", "Descend")],
+                     ("fly_down", 100.0, 3000.0, 50.0, "{:.0f}", "Descend")],
             hint=f"Hold {KEYS['fly_up']} to rise, {KEYS['fly_down']} to descend, W/A/S/D to fly. "
-                 "Release to hover. Fast descents can hurt on landing.")
+                 "Release to hover. Turn on No fall damage so landings are harmless.")
 
         c = self.card("Survival")
         self.sw_god = self.toggle_row(c, "Max health", KEYS["god"], ACTIONS["god"],
                                       hint="Health: -", first=True)
         self.lbl_health = self.last_hint
-        self.sw_land = self.toggle_row(c, "Safe landing", KEYS["land"], ACTIONS["land"],
-                                       hint="Caps fall speed so big drops don't kill you.")
+        self.sw_nofall = self.toggle_row(
+            c, "No fall damage", KEYS["nofall"], ACTIONS["nofall"],
+            hint="Falls and hard landings can't hurt you, at any speed. Animals and bullets still do. "
+                 "Restored when you turn it off or close the trainer.")
 
         c = self.card("Economy")
         row = tk.Frame(c, bg=CARD); row.pack(fill="x", padx=14, pady=12)
@@ -618,7 +676,7 @@ class App(tk.Tk):
 
     def refresh(self):
         self.sw_speed.set(S["speed_on"]); self.sw_jump.set(S["jump_on"]); self.sw_super.set(S["super_on"])
-        self.sw_god.set(S["god_on"]); self.sw_land.set(S["land_on"])
+        self.sw_god.set(S["god_on"]); self.sw_nofall.set(S["nofall_on"])
         for chips, key in ((self.weather_chips, "weather_i"), (self.time_chips, "time_i")):
             for i, ch in enumerate(chips):
                 on = (i == S[key])
