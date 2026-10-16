@@ -1,66 +1,100 @@
-<img width="476" height="1145" alt="Screenshot 2026-10-17 013225" src="https://github.com/user-attachments/assets/f3cff284-158c-476e-b443-60ca84349af7" />
- 
-Way Of The Hunter 2 Trainer
+# Way of the Hunter 2 Trainer
 
+A single-player trainer for **Way of the Hunter 2**, written in Python. Built by [Backtrackleb](https://github.com/backtrackleb).
 
+![WOTH2 Trainer screenshot](PASTE-YOUR-EXISTING-SCREENSHOT-LINK-OR-UPLOAD-IT-TO-A-docs-FOLDER)
 
-A single-player trainer for Way of the Hunter 2 by Backtrackleb.
+> **Single-player only.** Do not use it in the game's multiplayer or co-op modes.
+> It does not bypass any anti-cheat, and no support will be given for that.
 
-Speed boost, high jump, Superman (fly), max health, No fall damage, money,
+## Features
 
-weather and time-of-day control.
+- Speed boost
+- High jump
+- Superman mode (fly)
+- Max health
+- No fall damage
+- Money editing
+- Weather control
+- Time-of-day control
 
+## Compatibility
 
+| Item | Value |
+| --- | --- |
+| Game | Way of the Hunter 2 |
+| Tested game version | `REPLACE-WITH-BUILD-NUMBER` (Steam / Epic) |
+| Platform | Windows 10 / 11 |
+| Python | 3.10+ (if running from source) |
 
-\*\*Single-player only.\*\* Do not use it in the game's multiplayer or co-op modes.
+All memory offsets belong to one game build and **will break after a game patch**. See [Updating for a new game version](#updating-for-a-new-game-version).
 
-It does not bypass any anti-cheat, and no support will be given for that.
+## Download
 
-Not affiliated with or endorsed by Nine Rocks Games or THQ Nordic.
+Grab the latest `WOTH2Trainer.exe` from the [Releases](../../releases) page. The SHA-256 hash is listed in each release's notes so you can verify the file.
 
-Use at your own risk, and back up your save first (money edits are written to it).
+Antivirus software often flags tools that read other processes' memory. If you would rather not trust a prebuilt binary, build it yourself from this source (see below).
 
+## Usage
 
+1. Start Way of the Hunter 2 and load into the world with your character.
+2. Run the trainer **as administrator**.
+3. Toggle features with the hotkeys or the GUI.
 
-\## Run from source
+> Back up your save first. Money edits are written to it.
 
-&#x20;   pip install -r requirements.txt
+## Hotkeys
 
-&#x20;   python trainer\_gui.py        (from an administrator prompt, game running, character in the world)
+| Feature | Default key |
+| --- | --- |
+| Speed boost | `REPLACE` |
+| High jump | `REPLACE` |
+| Superman (fly) | `REPLACE` |
+| Max health | `REPLACE` |
+| No fall damage | `REPLACE` |
+| Add money | `REPLACE` |
+| Weather control | `REPLACE` |
+| Time of day | `REPLACE` |
 
+To change them, edit the `KEYS` block at the top of `trainer_gui.py`.
 
+## Run from source
 
-\## Build an exe
+```bash
+pip install -r requirements.txt
+python trainer_gui.py
+```
 
-&#x20;   pyinstaller --clean --onefile --noconsole --uac-admin --name WOTH2Trainer --hidden-import woth2lib --hidden-import pymem --hidden-import pymem.process trainer\_gui.py
+Run it from an administrator prompt, with the game running and your character in the world.
 
+## Build an exe
 
+```bash
+pyinstaller --clean --onefile --noconsole --uac-admin --name WOTH2Trainer --hidden-import woth2lib --hidden-import pymem --hidden-import pymem.process trainer_gui.py
+```
 
-Antivirus software often flags tools that read other processes' memory.
+The output is written to `dist/WOTH2Trainer.exe`.
 
-Build it yourself from this source if you want to be sure what it contains.
+## Updating for a new game version
 
+1. Generate a new SDK with [Dumper-7](https://github.com/Encryqed/Dumper-7).
+2. Update `GWORLD`, `GOBJECTS` and `APPEND_STRING` in `woth2lib.py`.
+3. Re-check the class offsets in `trainer_gui.py` against the new dump (see `tools/`).
 
+## Troubleshooting
 
-\## Updating for a new game version
+- **Nothing happens / features don't work:** the game was probably patched. Check the tested version above and open an issue.
+- **Antivirus flags the exe:** this is common for memory-editing tools. Build from source or verify the SHA-256 hash.
+- **Trainer can't attach:** run it as administrator and make sure the game is fully loaded into the world.
 
-All offsets belong to one game build and will break after a patch.
+## Reporting issues
 
-1\. Generate a new SDK with Dumper-7 (github.com/Encryqed/Dumper-7).
+Open an [issue](../../issues) and include your game version (and store: Steam / Epic), what you were doing, and any error text.
 
-2\. Update `GWORLD`, `GOBJECTS` and `APPEND\_STRING` in `woth2lib.py`.
+## Disclaimer
 
-3\. Re-check the class offsets in `trainer\_gui.py` against the new dump (see `tools/`).
+Not affiliated with or endorsed by Nine Rocks Games or THQ Nordic. Use at your own risk.
 
+## License
 
-
-\## Hotkeys
-
-Edit the `KEYS` block at the top of `trainer\_gui.py`.
-
-
-
-\## License
-
-MIT
-
+[MIT](LICENSE)
