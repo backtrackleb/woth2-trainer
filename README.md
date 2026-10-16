@@ -23,7 +23,7 @@ A single-player trainer for **Way of the Hunter 2**, written in Python. Built by
 | Item | Value |
 | --- | --- |
 | Game | Way of the Hunter 2 |
-| Tested game version | `REPLACE-WITH-BUILD-NUMBER` (Steam / Epic) |
+| Tested game version | `1.0` (Steam / Epic) |
 | Platform | Windows 10 / 11 |
 | Python | 3.10+ (if running from source) |
 
