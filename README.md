@@ -2,7 +2,7 @@
 
 A single-player trainer for **Way of the Hunter 2**, written in Python. Built by [Backtrackleb](https://github.com/backtrackleb).
 
-![WOTH2 Trainer screenshot](PASTE-YOUR-EXISTING-SCREENSHOT-LINK-OR-UPLOAD-IT-TO-A-docs-FOLDER)
+<img width="320" alt="WOTH2 Trainer screenshot" src="https://github.com/user-attachments/assets/f3cff284-158c-476e-b443-60ca84349af7" />
 
 > **Single-player only.** Do not use it in the game's multiplayer or co-op modes.
 > It does not bypass any anti-cheat, and no support will be given for that.
@@ -47,16 +47,15 @@ Antivirus software often flags tools that read other processes' memory. If you w
 
 | Feature | Default key |
 | --- | --- |
-| Speed boost | `REPLACE` |
-| High jump | `REPLACE` |
-| Superman (fly) | `REPLACE` |
-| Max health | `REPLACE` |
-| No fall damage | `REPLACE` |
-| Add money | `REPLACE` |
-| Weather control | `REPLACE` |
-| Time of day | `REPLACE` |
+| Speed boost | `F9` |
+| High jump | `F10` |
+| Superman (fly) | `INSERT` |
+| Max health | `F3` |
+| No fall damage | `F4` |
+| Add money | `F5-F6` |
+| Weather control | `F8` |
+| Time of day | `F7` |
 
-To change them, edit the `KEYS` block at the top of `trainer_gui.py`.
 
 ## Run from source
 
