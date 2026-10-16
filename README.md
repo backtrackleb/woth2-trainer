@@ -1,4 +1,6 @@
-\# WOTH2 Trainer
+<img width="476" height="1145" alt="Screenshot 2026-10-17 013225" src="https://github.com/user-attachments/assets/f3cff284-158c-476e-b443-60ca84349af7" />
+ 
+Way of the hunter 2 Trainer
 
 
 
