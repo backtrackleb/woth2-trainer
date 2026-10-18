@@ -8,3 +8,4 @@ __pycache__/
 search*.txt
 CppSDK/
 Dumper-7/*.bak_*
+*.bak_*
