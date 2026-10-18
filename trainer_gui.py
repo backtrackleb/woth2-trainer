@@ -141,10 +141,14 @@ def worker():
 
 def _worker():
     L = None
+    _why = [None]   # woth2_update: show why
     while L is None and not S["stop"]:
         try:
             L = importlib.import_module("woth2lib")
-        except (Exception, SystemExit):
+        except (Exception, SystemExit) as _ex:
+            _msg = str(_ex) or type(_ex).__name__
+            if _msg != _why[0]:
+                _why[0] = _msg; log("Cannot connect: " + _msg)
             S["status"] = "waiting_game"
             time.sleep(2.0)
     if L is None:

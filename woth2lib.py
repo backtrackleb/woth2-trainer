@@ -2,8 +2,8 @@
 import struct, pymem, pymem.process
 
 PROC = "WOTH2-Win64-Shipping.exe"
-GWORLD = 0xAFF5238
-GOBJECTS, APPEND_STRING = 0xAE6A460, 0x1398DA0
+GWORLD = 0xB0016B8
+GOBJECTS, APPEND_STRING = 0xAE768E0, 0x1399CC0
 CHUNK, ISZ, SHIFT, POFF = 0x10000, 0x18, 16, 0x10   # entry layout found by the detector
 
 pm = pymem.Pymem(PROC)
@@ -41,7 +41,7 @@ def _find_namepool():
 
 _pool, _blk = _find_namepool()
 if not _pool:
-    raise SystemExit("Could not locate FNamePool.")
+    raise SystemExit("The name table was not found: the game was probably updated, so the saved offsets are out of date. Re-run Dumper-7 on the current game, then run woth2_update.py")
 
 _names = {}
 def fname(idx, num=0):

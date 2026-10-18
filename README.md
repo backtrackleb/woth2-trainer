@@ -23,7 +23,7 @@ A single-player trainer for **Way of the Hunter 2**, written in Python. Built by
 | Item | Value |
 | --- | --- |
 | Game | Way of the Hunter 2 |
-| Tested game version | `1.0` (Steam / Epic) |
+| Tested game version | 1.3 (`5.7.4-215031+++WOTH2+R-1.3`) (Steam / Epic) |
 | Platform | Windows 10 / 11 |
 | Python | 3.10+ (if running from source) |
 
@@ -69,19 +69,31 @@ Run it from an administrator prompt, with the game running and your character in
 ## Build an exe
 
 ```bash
-pyinstaller --clean --onefile --noconsole --uac-admin --name WOTH2Trainer --hidden-import woth2lib --hidden-import pymem --hidden-import pymem.process trainer_gui.py
+rmdir /s /q build dist
+pyinstaller --clean --onefile --noconsole --uac-admin --name WOTH2Trainer --hidden-import woth2lib --hidden-import pymem --hidden-import pymem.process --hidden-import keyboard trainer_gui.py
 ```
 
-The output is written to `dist/WOTH2Trainer.exe`.
+The output is written to `dist/WOTH2Trainer.exe`. The offsets are compiled into the exe, so **rebuild it after every offset update**.
 
 ## Updating for a new game version
 
-1. Generate a new SDK with [Dumper-7](https://github.com/Encryqed/Dumper-7).
-2. Update `GWORLD`, `GOBJECTS` and `APPEND_STRING` in `woth2lib.py`.
-3. Re-check the class offsets in `trainer_gui.py` against the new dump (see `tools/`).
+After a patch the trainer may sit on "Waiting for game..." or fail to connect, because the offsets belong to one game build.
+
+1. Generate a new SDK of the **updated** game with [Dumper-7](https://github.com/Encryqed/Dumper-7): build it as an x64 Release DLL, inject it into the running game (offline, single-player only), and wait for `Generating SDK took ...`.
+2. Run the updater from the trainer folder. It finds the newest dump under `C:\Dumper-7`:
+
+   ```bash
+   python woth2_update.py --dry-run   # report only, changes nothing
+   python woth2_update.py             # applies what it can verify, keeps .bak copies
+   ```
+
+   Or point it at a dump: `python woth2_update.py --dump "C:\Dumper-7\<folder>" --dir "<trainer folder>"`.
+3. Read the **NEEDS ATTENTION** list it prints. It checks the player chain, movement, health root and economy offsets by name, and checks the layout types of the weather and sky actors. Anything it cannot verify is listed instead of being changed, so leave that feature off until it is re-mapped (see `tools/`). The health node internals and the fall-damage curve cannot be checked by name: test Max health and No fall damage once in a safe spot.
+4. Rebuild the exe if you use it, start the game, load into the world, start the trainer.
 
 ## Troubleshooting
 
+- **"Waiting for game..." although the game is running:** the Log panel shows the real reason. If it says the name table was not found, the game was updated: follow [Updating for a new game version](#updating-for-a-new-game-version).
 - **Nothing happens / features don't work:** the game was probably patched. Check the tested version above and open an issue.
 - **Antivirus flags the exe:** this is common for memory-editing tools. Build from source or verify the SHA-256 hash.
 - **Trainer can't attach:** run it as administrator and make sure the game is fully loaded into the world.
